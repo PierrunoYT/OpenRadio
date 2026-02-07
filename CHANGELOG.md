@@ -6,7 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.2.0] - 2025-02-07
+## [0.2.1] - 2026-02-07
+
+### Added
+
+- Screenshot of the Discover view added to `assets/`
+- README now displays the screenshot at the top
+- Project structure in README updated to include `assets/` directory
+
+---
+
+## [0.2.0] - 2026-02-07
 
 ### Fixed
 
@@ -28,7 +38,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.1.0] - 2025-02-07
+## [0.1.0] - 2026-02-07
 
 ### Added
 

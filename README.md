@@ -8,6 +8,8 @@ No accounts, no ads, no tracking. Just open and listen.
 ![Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen.svg)
 ![Build](https://img.shields.io/badge/build-none_needed-brightgreen.svg)
 
+![OpenRadio Screenshot](assets/Screenshot%202026-02-07%20at%2013-20-47%20OpenRadio%20-%20Worldwide%20Internet%20Radio.png)
+
 ---
 
 ## Features
@@ -78,6 +80,7 @@ Then visit `http://localhost:8000`.
 
 ```
 OpenRadio/
+├── assets/       # Screenshots and images
 ├── index.html    # App structure and layout
 ├── style.css     # Dark theme styling and responsive design
 ├── app.js        # Application logic, API calls, audio player
