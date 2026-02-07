@@ -12,7 +12,7 @@
     'https://at1.api.radio-browser.info',
   ];
 
-  const ITEMS_PER_PAGE = 30;
+  const PAGE_SIZE = 50;
   const DISCOVER_LIMIT = 24;
   const SEARCH_DEBOUNCE = 400;
   const FAV_KEY = 'openradio_favorites';
@@ -27,6 +27,21 @@
   let isLoading = false;
   let favorites = {};
   let searchTimeout = null;
+
+  // Pagination state for each paginated view
+  const pagination = {
+    country: { offset: 0, allStations: [], endpoint: '', hasMore: true, loading: false },
+    genre:   { offset: 0, allStations: [], endpoint: '', hasMore: true, loading: false },
+    lang:    { offset: 0, allStations: [], endpoint: '', hasMore: true, loading: false },
+    search:  { offset: 0, allStations: [], query: '', hasMore: true, loading: false },
+  };
+
+  function resetPagination(key) {
+    pagination[key].offset = 0;
+    pagination[key].allStations = [];
+    pagination[key].hasMore = true;
+    pagination[key].loading = false;
+  }
 
   // ===== DOM References =====
   const $ = (sel) => document.querySelector(sel);
@@ -197,14 +212,23 @@
       const container = $('#search-results');
       container.innerHTML = '<div class="loading-placeholder"><div class="loader"></div></div>';
 
+      resetPagination('search');
+      pagination.search.query = query;
+      pagination.search.endpoint = 'stations/search';
+
       try {
-        const results = await apiFetch('stations/search', {
+        const params = {
           name: query,
-          limit: 60,
+          limit: PAGE_SIZE,
+          offset: 0,
           hidebroken: true,
           order: 'votes',
           reverse: true,
-        });
+        };
+
+        const results = await apiFetch('stations/search', params);
+
+        container.innerHTML = '';
 
         if (results.length === 0) {
           container.innerHTML = `
@@ -213,7 +237,22 @@
               <span>Try a different search term</span>
             </div>`;
         } else {
-          renderStationGrid('search-results', results);
+          pagination.search.allStations = results;
+          pagination.search.offset = results.length;
+          pagination.search.hasMore = results.length >= PAGE_SIZE;
+
+          appendStationCards(container, results, pagination.search.allStations);
+
+          if (pagination.search.hasMore) {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'load-more-wrapper';
+            wrapper.innerHTML = `<button class="load-more-btn">Load More Stations</button>`;
+            wrapper.querySelector('.load-more-btn').addEventListener('click', () => {
+              wrapper.innerHTML = '<div class="loader"></div>';
+              fetchMoreStations('search', container, false);
+            });
+            container.appendChild(wrapper);
+          }
         }
       } catch (err) {
         console.error('Search failed:', err);
@@ -286,19 +325,70 @@
       listEl.classList.remove('hidden');
     });
 
-    try {
-      const stations = await apiFetch('stations/bycountryexact/' + encodeURIComponent(country), {
-        limit: 100,
-        hidebroken: true,
-        order: 'votes',
-        reverse: true,
-      });
+    resetPagination('country');
+    pagination.country.endpoint = 'stations/bycountryexact/' + encodeURIComponent(country);
+    await fetchMoreStations('country', stationsEl, true);
+  }
 
-      const header = stationsEl.querySelector('div:first-child').outerHTML;
-      stationsEl.innerHTML = header;
-      appendStationCards(stationsEl, stations);
+  async function fetchMoreStations(key, container, isFirstLoad) {
+    const pag = pagination[key];
+    if (pag.loading || !pag.hasMore) return;
+    pag.loading = true;
+
+    // Build the request params
+    const params = {
+      limit: PAGE_SIZE,
+      offset: pag.offset,
+      hidebroken: true,
+      order: 'votes',
+      reverse: true,
+    };
+
+    // For search, use a different endpoint structure
+    let endpoint = pag.endpoint;
+    if (key === 'search') {
+      endpoint = 'stations/search';
+      params.name = pag.query;
+    }
+
+    try {
+      const stations = await apiFetch(endpoint, params);
+
+      if (isFirstLoad) {
+        // Remove the loader, keep the header
+        const header = container.querySelector('div:first-child');
+        container.innerHTML = '';
+        if (header) container.appendChild(header);
+      }
+
+      // Remove existing load-more button
+      const existingBtn = container.querySelector('.load-more-wrapper');
+      if (existingBtn) existingBtn.remove();
+
+      pag.allStations = pag.allStations.concat(stations);
+      pag.offset += stations.length;
+      pag.hasMore = stations.length >= PAGE_SIZE;
+
+      appendStationCards(container, stations, pag.allStations);
+
+      // Add "Load More" button if there are more results
+      if (pag.hasMore) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'load-more-wrapper';
+        wrapper.innerHTML = `<button class="load-more-btn">Load More Stations</button>`;
+        wrapper.querySelector('.load-more-btn').addEventListener('click', () => {
+          wrapper.innerHTML = '<div class="loader"></div>';
+          fetchMoreStations(key, container, false);
+        });
+        container.appendChild(wrapper);
+      }
     } catch (err) {
-      console.error('Failed to load country stations:', err);
+      console.error(`Failed to load stations (${key}):`, err);
+      if (isFirstLoad) {
+        showError(container.id, 'Failed to load stations. Please try again.');
+      }
+    } finally {
+      pag.loading = false;
     }
   }
 
@@ -357,20 +447,9 @@
       listEl.classList.remove('hidden');
     });
 
-    try {
-      const stations = await apiFetch('stations/bytag/' + encodeURIComponent(tag), {
-        limit: 100,
-        hidebroken: true,
-        order: 'votes',
-        reverse: true,
-      });
-
-      const header = stationsEl.querySelector('div:first-child').outerHTML;
-      stationsEl.innerHTML = header;
-      appendStationCards(stationsEl, stations);
-    } catch (err) {
-      console.error('Failed to load genre stations:', err);
-    }
+    resetPagination('genre');
+    pagination.genre.endpoint = 'stations/bytag/' + encodeURIComponent(tag);
+    await fetchMoreStations('genre', stationsEl, true);
   }
 
   // ===== Languages =====
@@ -428,20 +507,9 @@
       listEl.classList.remove('hidden');
     });
 
-    try {
-      const stations = await apiFetch('stations/bylanguageexact/' + encodeURIComponent(lang), {
-        limit: 100,
-        hidebroken: true,
-        order: 'votes',
-        reverse: true,
-      });
-
-      const header = stationsEl.querySelector('div:first-child').outerHTML;
-      stationsEl.innerHTML = header;
-      appendStationCards(stationsEl, stations);
-    } catch (err) {
-      console.error('Failed to load language stations:', err);
-    }
+    resetPagination('lang');
+    pagination.lang.endpoint = 'stations/bylanguageexact/' + encodeURIComponent(lang);
+    await fetchMoreStations('lang', stationsEl, true);
   }
 
   // ===== Favorites =====
@@ -552,8 +620,10 @@
     appendStationCards(container, stations);
   }
 
-  function appendStationCards(container, stations) {
+  function appendStationCards(container, stations, fullList) {
     const frag = document.createDocumentFragment();
+    // fullList is the complete accumulated list (for prev/next across pages)
+    const playableList = fullList || stations;
 
     stations.forEach((station, idx) => {
       const card = document.createElement('div');
@@ -599,10 +669,9 @@
           return;
         }
 
-        // Build the current playable list from this container
-        const allCards = container.querySelectorAll('.station-card');
-        currentList = stations;
-        currentIndex = stations.findIndex((s) => s.stationuuid === station.stationuuid);
+        // Use the full accumulated list for prev/next navigation
+        currentList = playableList;
+        currentIndex = playableList.findIndex((s) => s.stationuuid === station.stationuuid);
 
         playStation(station);
       });

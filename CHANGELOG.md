@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.3.0] - 2026-02-07
+
+### Added
+
+- **Pagination** — "Load More Stations" button on all station lists (country, genre, language, search)
+- Stations load in pages of 50 with unlimited scrolling via Load More
+- Previous/next player controls now work across all loaded pages
+- Styled Load More button with hover effects matching the app theme
+
+### Changed
+
+- Station lists no longer hard-capped at 100 results
+- Search results now paginated (previously limited to 60)
+- Refactored station fetching into a shared `fetchMoreStations` helper for consistency
+
+---
+
 ## [0.2.1] - 2026-02-07
 
 ### Added
